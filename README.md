@@ -46,9 +46,8 @@ npm start
 Должен прийти JSON с мемами.
 
 ## 3.2 Запуск фронтенда (frontend)
-В другой вкладке терминала:
+В корне проекта (RandomMemes):
 
 ```bash
-cd RandomMemes
 npm run dev
 ```
