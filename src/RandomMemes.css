@@ -133,3 +133,13 @@
   border: none;
   cursor: pointer;
 }
+
+.update-btn {
+  margin-left: 12px;
+  padding: 8px 16px;
+}
+
+.update-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

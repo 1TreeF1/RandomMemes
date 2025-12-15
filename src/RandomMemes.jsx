@@ -1,64 +1,110 @@
 import { useEffect, useState } from "react";
 import "./RandomMemes.css";
+import MemesHeader from "./components/MemesHeader.jsx";
+import MemesGrid from "./components/MemesGrid.jsx";
+import MemeModal from "./components/MemeModal.jsx";
+
+const CATEGORIES = [
+  "memes",
+  "dankmemes",
+  "funny",
+  "me_irl",
+  "wholesomememes",
+  "HistoryMemes",
+  "terriblefacebookmemes",
+  "PrequelMemes",
+  "ProgrammingHumor",
+  "AnimalsBeingDerps",
+  "teenagers",
+  "techsupportgore",
+  "surrealmemes",
+  "memeconomy",
+  "comedyheaven",
+  "funnyandsad",
+  "unexpected",
+  "gamingmemes",
+  "officehumor",
+];
 
 export default function RandomMemes() {
   const [memes, setMemes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [category, setCategory] = useState("all"); // all | mixed | сабреддит
 
-  async function loadMemes() {
+  function getRandomFromArray(arr, count = 5) {
+    if (!arr || arr.length === 0) return [];
+    const shuffled = [...arr].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, count);
+  }
+
+  async function fetchCategoryMemes(sub) {
+    const params = sub ? `?sub=${encodeURIComponent(sub)}` : "";
+    const res = await fetch(`http://localhost:5000/api/memes${params}`);
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      if (res.status === 404) throw new Error("Сорян, ничего не нашли 😢");
+      if (res.status >= 500)
+        throw new Error("Серверу плохо, не можем порадовать вас мемами 😔");
+      throw new Error(data.error || "Что-то пошло не так 🤔");
+    }
+
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function loadMemesByCategory() {
     setLoading(true);
-    setErrorMessage(null); 
+    setErrorMessage(null);
+    setMemes([]);
+
     try {
-      const res = await fetch("http://localhost:5000/api/memes");
-
-      const data = await res.json();
-
-      // Если сервер вернул ошибку
-      if (!res.ok || data.error) {
-        setMemes([]);
-        if (res.status === 404) {
-          setErrorMessage("Сорян, ничего не нашли 😢");
-        } else if (res.status >= 500) {
-          setErrorMessage("Серверу плохо, не можем порадовать вас мемами 😔");
-        } else if (data.error) {
-          setErrorMessage(data.error);
-        } else {
-          setErrorMessage("Что-то пошло не так 🤔");
+      if (category === "mixed") {
+        const result = [];
+        for (let i = 0; i < 5; i++) {
+          const randomCategory =
+            CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+          try {
+            const list = await fetchCategoryMemes(randomCategory);
+            const one = getRandomFromArray(list, 1)[0];
+            if (one) result.push(one);
+          } catch (e) {
+            console.warn("Ошибка по категории", randomCategory, e.message);
+          }
         }
+        setMemes(result);
+      } else if (category === "all") {
+        const list = await fetchCategoryMemes(null); // бэк выберет саб сам
+        setMemes(getRandomFromArray(list, 5));
       } else {
-        // Выбираем случайные 5 мемов без повторов
-        const uniqueMemes = getRandomMemes(data, 5);
-        setMemes(uniqueMemes);
+        const list = await fetchCategoryMemes(category);
+        setMemes(getRandomFromArray(list, 5));
       }
     } catch (e) {
-      console.error("Ошибка загрузки мемов:", e);
-      setMemes([]);
-      setErrorMessage("Не удалось подключиться к серверу 😢");
+      console.error(e);
+      setErrorMessage(e.message || "Не удалось подключиться к серверу 😢");
     }
+
     setLoading(false);
   }
 
   useEffect(() => {
-    loadMemes();
-  }, []);
+    loadMemesByCategory();
+  }, [category]);
 
   const firstRow = memes.slice(0, 3);
   const secondRow = memes.slice(3, 5);
 
-  // Вспомогательная функция для случайных мемов
-  function getRandomMemes(allMemes, count = 5) {
-    if (!allMemes || allMemes.length === 0) return [];
-    const shuffled = [...allMemes].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count);
-  }
-
   return (
     <div className="random-memes-container">
-      <div className="random-memes-header">
-        <h1>🔥 Рандомные мемы</h1>
-      </div>
+      <MemesHeader
+        categories={CATEGORIES}
+        category={category}
+        onCategoryChange={setCategory}
+        onReload={loadMemesByCategory}
+        loading={loading}
+      />
 
       {loading && <p>Загрузка...</p>}
 
@@ -71,48 +117,15 @@ export default function RandomMemes() {
       )}
 
       {!loading && !errorMessage && memes.length > 0 && (
-        <>
-          <div className="memes-grid">
-            {firstRow.map((meme) => (
-              <div key={meme.url} className="meme-card" onClick={() => setSelected(meme)}>
-                <img src={meme.url} alt="" />
-                <div className="meme-title">{meme.title}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="memes-row-center">
-            {secondRow.map((meme) => (
-              <div
-                key={meme.url}
-                className="meme-card"
-                onClick={() => setSelected(meme)}
-                style={{ width: "32%", maxWidth: 320 }}
-              >
-                <img src={meme.url} alt="" />
-                <div className="meme-title">{meme.title}</div>
-              </div>
-            ))}
-          </div>
-        </>
+        <MemesGrid
+          firstRow={firstRow}
+          secondRow={secondRow}
+          onSelect={setSelected}
+        />
       )}
 
-      <button className="update-btn" onClick={loadMemes}>
-        🔄 Обновить мемы
-      </button>
-
       {selected && (
-        <div className="meme-modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="meme-modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="meme-modal-img-container">
-              <img className="meme-modal-img" src={selected.url} alt={selected.title} />
-            </div>
-            <h2 className="meme-modal-title">{selected.title || "Без названия"}</h2>
-            <button className="meme-modal-close-btn" onClick={() => setSelected(null)}>
-              Закрыть
-            </button>
-          </div>
-        </div>
+        <MemeModal meme={selected} onClose={() => setSelected(null)} />
       )}
     </div>
   );
