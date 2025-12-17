@@ -51,3 +51,5 @@ npm start
 ```bash
 npm run dev
 ```
+
+P.S Нужно использовать файл .env
